@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wavelength - Music Player</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="logo">♪ <span>Wavelength</span></div>
+      <p class="nav-heading">MENU</p>
+      <nav>
+        <button class="nav-item active" data-section="home">⌂ <span>Home</span></button>
+        <button class="nav-item" data-section="library">♫ <span>Music Library</span></button>
+        <button class="nav-item" data-section="playlists">▤ <span>My Playlists</span></button>
+        <button class="nav-item" data-section="recent">◷ <span>Recently Played</span></button>
+        <button class="nav-item" data-section="queue">☷ <span>Upcoming Queue</span></button>
+      </nav>
+      <div class="sidebar-note"><span class="note-icon">♪</span><p>Your music.<br> Your wavelength.</p></div>
+    </aside>
+
+    <main class="main-content">
+      <header class="topbar"><div><span class="eyebrow">YOUR PERSONAL MUSIC SPACE</span><h1>Good music, good mood.</h1></div><div class="profile">W</div></header>
+
+      <section id="home" class="section active">
+        <div class="hero"><div><span class="eyebrow">WELCOME TO WAVELENGTH</span><h2>Find your rhythm.</h2><p>Your music collection, all in one place.</p><button class="primary-btn" data-go="library">Explore library</button></div><div class="hero-note">♫</div></div>
+        <div class="section-heading"><div><span class="eyebrow">START LISTENING</span><h2>Quick access</h2></div></div>
+        <div class="quick-grid">
+          <button class="quick-card" data-go="library"><span>♫</span><strong>Music Library</strong><small>Browse your songs</small></button>
+          <button class="quick-card" data-go="playlists"><span>▤</span><strong>My Playlists</strong><small>Your saved collections</small></button>
+          <button class="quick-card" data-go="recent"><span>◷</span><strong>Recently Played</strong><small>Return to your music</small></button>
+        </div>
+      </section>
+
+      <section id="library" class="section">
+        <div class="section-heading"><div><span class="eyebrow">YOUR COLLECTION</span><h2>Music Library</h2></div></div>
+        <div class="song-list" id="song-list">
+          <div class="song-row"><span class="song-number">01</span><div class="song-art">♫</div><div class="song-info"><strong>Blinding Lights</strong><small>The Weeknd</small></div><span class="song-album">After Hours</span><span class="song-duration">3:20</span></div>
+          <div class="song-row"><span class="song-number">02</span><div class="song-art">♫</div><div class="song-info"><strong>Starboy</strong><small>The Weeknd</small></div><span class="song-album">Starboy</span><span class="song-duration">3:50</span></div>
+          <div class="song-row"><span class="song-number">03</span><div class="song-art">♫</div><div class="song-info"><strong>Believer</strong><small>Imagine Dragons</small></div><span class="song-album">Evolve</span><span class="song-duration">3:24</span></div>
+          <div class="song-row"><span class="song-number">04</span><div class="song-art">♫</div><div class="song-info"><strong>Perfect</strong><small>Ed Sheeran</small></div><span class="song-album">Divide</span><span class="song-duration">4:23</span></div>
+          <div class="song-row"><span class="song-number">05</span><div class="song-art">♫</div><div class="song-info"><strong>Faded</strong><small>Alan Walker</small></div><span class="song-album">Different World</span><span class="song-duration">3:32</span></div>
+        </div>
+      </section>
+
+      <section id="playlists" class="section">
+
+  <div class="section-heading">
+    <div>
+      <span class="eyebrow">YOUR COLLECTIONS</span>
+      <h2>My Playlists</h2>
+    </div>
+
+    <button id="create-playlist-btn" class="primary-button">
+      + Create Playlist
+    </button>
+  </div>
+
+  <div id="playlist-container">
+
+    <div class="empty-state">
+      <span>▤</span>
+      <h3>No playlists yet</h3>
+      <p>Create your first playlist to get started.</p>
+    </div>
+
+  </div>
+
+</section>
+<section id="recent" class="section">
+  <div class="section-heading">
+    <div>
+      <span class="eyebrow">YOUR LISTENING HISTORY</span>
+      <h2>Recently Played</h2>
+    </div>
+  </div>
+
+  <div class="song-list" id="recent-list"></div>
+</section>
+ <section id="queue" class="section">
+
+  <div class="section-heading">
+    <div>
+      <span class="eyebrow">UP NEXT</span>
+      <h2>Upcoming Queue</h2>
+    </div>
+  </div>
+
+  <div class="queue-actions">
+    <button id="add-to-queue-btn" class="primary-button">
+      + Add Song
+    </button>
+  </div>
+
+  <div class="song-list" id="queue-list"></div>
+
+</section>
+    </main>
+
+    <footer class="player-bar"><div class="now-playing"><div class="mini-art">♫</div><div><strong id="current-title">Choose a song</strong><small id="current-artist">Nothing playing</small></div></div><div class="player-controls"><div class="control-buttons"><button aria-label="Previous">|◀</button><button class="play-button" id="play-button" aria-label="Play">▶</button><button aria-label="Next">▶|</button></div><div class="progress-line"><span>0:00</span><input type="range" min="0" max="100" value="0"><span>0:00</span></div></div><div class="volume-control">♫ <input type="range" min="0" max="100" value="70" aria-label="Volume"></div></footer>
+  </div>
+  <script src="js/app.js"></script>
+</body>
+</html>
