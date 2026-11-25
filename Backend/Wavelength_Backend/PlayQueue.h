@@ -15,9 +15,12 @@ public:
 
     bool isEmpty() const;
     bool isFull() const;
-    bool enqueue(const Song& s);
-    bool dequeue(Song& out);
-    void display() const;
+   bool enqueue(const Song& s);
+   bool dequeue(Song& out);
+  void display() const;
+
+int getCount() const;
+const Song& getSongAt(int index) const;
 };
 
 #endif

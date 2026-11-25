@@ -26,13 +26,14 @@ document.querySelectorAll('[data-go]').forEach(button => {
 
 
 // ==========================================
-// 2. MUSIC LIBRARY - C++ BACKEND
+// 2. BACKEND AND MUSIC LIBRARY
 // ==========================================
 
 let songs = [];
 
 const API_URL = 'http://localhost:8080/api/songs';
 const RECENT_API_URL = 'http://localhost:8080/api/recent';
+const QUEUE_API_URL = 'http://localhost:8080/api/queue';
 
 const audioFiles = {
     1: 'songs/blinding-lights.mp3',
@@ -46,12 +47,17 @@ const audio = new Audio();
 let currentIndex = -1;
 
 const playButton = document.getElementById('play-button');
+const previousButton = document.getElementById('previous-button');
+const nextButtonElement = document.getElementById('next-button');
+
 const currentTitle = document.getElementById('current-title');
 const currentArtist = document.getElementById('current-artist');
 
-const progressBar = document.querySelector('.progress-line input');
-const volumeSlider = document.querySelector('.volume-control input');
+const progressBar = document.getElementById('progress-bar');
+const currentTimeLabel = document.getElementById('current-time');
+const durationLabel = document.getElementById('duration-time');
 
+const volumeSlider = document.querySelector('.volume-control input');
 const songList = document.getElementById('song-list');
 
 
@@ -60,77 +66,20 @@ const songList = document.getElementById('song-list');
 // ==========================================
 
 let recentlyPlayed = [];
-
 const recentList = document.getElementById('recent-list');
 
 
 // ==========================================
-// 4. CIRCULAR QUEUE
+// 4. UPCOMING QUEUE - C++ CIRCULAR QUEUE
 // ==========================================
 
-class CircularQueue {
-    constructor(size) {
-        this.size = size;
-        this.queue = new Array(size);
-        this.front = 0;
-        this.rear = -1;
-        this.count = 0;
-    }
-
-    enqueue(songIndex) {
-        if (this.count === this.size) {
-            return false;
-        }
-
-        this.rear = (this.rear + 1) % this.size;
-        this.queue[this.rear] = songIndex;
-        this.count++;
-
-        return true;
-    }
-
-    dequeue() {
-        if (this.count === 0) {
-            return null;
-        }
-
-        const songIndex = this.queue[this.front];
-
-        this.front = (this.front + 1) % this.size;
-        this.count--;
-
-        if (this.count === 0) {
-            this.front = 0;
-            this.rear = -1;
-        }
-
-        return songIndex;
-    }
-
-    getAll() {
-        const result = [];
-
-        for (let i = 0; i < this.count; i++) {
-            const index = (this.front + i) % this.size;
-            result.push(this.queue[index]);
-        }
-
-        return result;
-    }
-
-    isEmpty() {
-        return this.count === 0;
-    }
-}
-
-const playQueue = new CircularQueue(10);
-
+let queuedSongs = [];
 const queueList = document.getElementById('queue-list');
 const addToQueueButton = document.getElementById('add-to-queue-btn');
 
 
 // ==========================================
-// 5. FETCH SONGS FROM C++ BACKEND
+// 5. FETCH SONGS
 // ==========================================
 
 async function loadSongs() {
@@ -138,7 +87,7 @@ async function loadSongs() {
         const response = await fetch(API_URL);
 
         if (!response.ok) {
-            throw new Error('Backend returned an error.');
+            throw new Error('Unable to load songs.');
         }
 
         const backendSongs = await response.json();
@@ -150,26 +99,16 @@ async function loadSongs() {
 
         renderLibrary();
 
-        console.log('Songs loaded from C++ backend:', songs);
+        console.log('Songs loaded:', songs);
 
     } catch (error) {
-        console.error('Unable to load songs:', error);
-
-        if (songList) {
-            songList.replaceChildren();
-
-            const message = document.createElement('p');
-            message.textContent =
-                'Unable to connect to the backend. Make sure the C++ server is running.';
-
-            songList.appendChild(message);
-        }
+        console.error('Song loading error:', error);
     }
 }
 
 
 // ==========================================
-// 6. LOAD RECENTLY PLAYED FROM C++ STACK
+// 6. LOAD RECENTLY PLAYED
 // ==========================================
 
 async function loadRecentlyPlayed() {
@@ -177,21 +116,41 @@ async function loadRecentlyPlayed() {
         const response = await fetch(RECENT_API_URL);
 
         if (!response.ok) {
-            throw new Error('Unable to load recently played songs.');
+            throw new Error('Unable to load recently played.');
         }
 
         recentlyPlayed = await response.json();
-
         renderRecentlyPlayed();
 
     } catch (error) {
-        console.error('Recently Played error:', error);
+        console.error('Recently played error:', error);
     }
 }
 
 
 // ==========================================
-// 7. UPDATE SONG DETAILS
+// 7. LOAD QUEUE
+// ==========================================
+
+async function loadQueue() {
+    try {
+        const response = await fetch(QUEUE_API_URL);
+
+        if (!response.ok) {
+            throw new Error('Unable to load queue.');
+        }
+
+        queuedSongs = await response.json();
+        renderQueue();
+
+    } catch (error) {
+        console.error('Queue loading error:', error);
+    }
+}
+
+
+// ==========================================
+// 8. UPDATE SONG DETAILS
 // ==========================================
 
 function updateSongDetails() {
@@ -203,47 +162,62 @@ function updateSongDetails() {
 
 
 // ==========================================
-// 8. PLAY SONG AND UPDATE C++ STACK
+// 9. FORMAT TIME
+// ==========================================
+
+function formatTime(seconds) {
+    if (!Number.isFinite(seconds)) return '0:00';
+
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = Math.floor(seconds % 60);
+
+    return `${minutes}:${String(remainingSeconds).padStart(2, '0')}`;
+}
+
+
+// ==========================================
+// 10. PLAY SONG
 // ==========================================
 
 async function playSong(index) {
     if (index < 0 || index >= songs.length) return;
 
     currentIndex = index;
+
     audio.src = songs[index].file;
+    audio.load();
 
     updateSongDetails();
+
+    if (progressBar) progressBar.value = 0;
+    if (currentTimeLabel) currentTimeLabel.textContent = '0:00';
+    if (durationLabel) durationLabel.textContent = '0:00';
 
     try {
         await audio.play();
 
-        try {
-            const response = await fetch(RECENT_API_URL, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'text/plain'
-                },
-                body: String(songs[index].id)
-            });
+        const response = await fetch(RECENT_API_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'text/plain'
+            },
+            body: String(songs[index].id)
+        });
 
-            if (!response.ok) {
-                throw new Error('Backend could not update recently played.');
-            }
-
-            await loadRecentlyPlayed();
-
-        } catch (error) {
-            console.error('Unable to update recently played:', error);
+        if (!response.ok) {
+            throw new Error('Unable to update recently played.');
         }
 
+        await loadRecentlyPlayed();
+
     } catch (error) {
-        console.error('Unable to play song:', error);
+        console.error('Playback error:', error);
     }
 }
 
 
 // ==========================================
-// 9. PLAYBACK CONTROLS
+// 11. PLAY / PAUSE
 // ==========================================
 
 function togglePlay() {
@@ -252,40 +226,12 @@ function togglePlay() {
     if (currentIndex === -1) {
         playSong(0);
     } else if (audio.paused) {
-        audio.play();
+        audio.play().catch(error => {
+            console.error('Play error:', error);
+        });
     } else {
         audio.pause();
     }
-}
-
-function nextSong() {
-    if (songs.length === 0) return;
-
-    if (!playQueue.isEmpty()) {
-        const queuedSong = playQueue.dequeue();
-
-        renderQueue();
-        playSong(queuedSong);
-        return;
-    }
-
-    if (currentIndex === -1) {
-        playSong(0);
-        return;
-    }
-
-    playSong((currentIndex + 1) % songs.length);
-}
-
-function previousSong() {
-    if (songs.length === 0) return;
-
-    if (currentIndex === -1) {
-        playSong(0);
-        return;
-    }
-
-    playSong((currentIndex - 1 + songs.length) % songs.length);
 }
 
 if (playButton) {
@@ -300,29 +246,125 @@ audio.addEventListener('pause', () => {
     if (playButton) playButton.textContent = '▶';
 });
 
+
+// ==========================================
+// 12. NEXT SONG - C++ QUEUE FIRST
+// ==========================================
+
+let changingSong = false;
+
+async function nextSong() {
+    if (changingSong || songs.length === 0) return;
+
+    changingSong = true;
+
+    try {
+        const response = await fetch(QUEUE_API_URL);
+
+        if (!response.ok) {
+            throw new Error('Unable to check queue.');
+        }
+
+        const queue = await response.json();
+
+        if (queue.length > 0) {
+            const nextQueuedSong = queue[0];
+
+            const songIndex = songs.findIndex(
+                song => song.id === nextQueuedSong.id
+            );
+
+            if (songIndex === -1) {
+                throw new Error('Queued song not found in library.');
+            }
+
+            const deleteResponse = await fetch(QUEUE_API_URL, {
+                method: 'DELETE'
+            });
+
+            if (!deleteResponse.ok) {
+                throw new Error('Unable to remove queued song.');
+            }
+
+            await loadQueue();
+            await playSong(songIndex);
+
+        } else {
+            const nextIndex = currentIndex === -1
+                ? 0
+                : (currentIndex + 1) % songs.length;
+
+            await playSong(nextIndex);
+        }
+
+    } catch (error) {
+        console.error('Next song error:', error);
+    } finally {
+        changingSong = false;
+    }
+}
+
+
+// ==========================================
+// 13. PREVIOUS SONG
+// ==========================================
+
+async function previousSong() {
+    if (songs.length === 0) return;
+
+    const previousIndex = currentIndex === -1
+        ? 0
+        : (currentIndex - 1 + songs.length) % songs.length;
+
+    await playSong(previousIndex);
+}
+
+
+// ==========================================
+// 14. CONNECT PLAYER BUTTONS
+// ==========================================
+
+if (previousButton) {
+    previousButton.addEventListener('click', previousSong);
+}
+
+if (nextButtonElement) {
+    nextButtonElement.addEventListener('click', nextSong);
+}
+
+
+// Automatically play next song when current song ends.
 audio.addEventListener('ended', nextSong);
 
 
 // ==========================================
-// 10. PROGRESS BAR
+// 15. PROGRESS BAR AND TIME DISPLAY
 // ==========================================
 
+audio.addEventListener('timeupdate', () => {
+    if (audio.duration && progressBar) {
+        progressBar.value =
+            (audio.currentTime / audio.duration) * 100;
+    }
+
+    if (currentTimeLabel) {
+        currentTimeLabel.textContent = formatTime(audio.currentTime);
+    }
+});
+
+audio.addEventListener('loadedmetadata', () => {
+    if (progressBar) progressBar.value = 0;
+
+    if (currentTimeLabel) {
+        currentTimeLabel.textContent = '0:00';
+    }
+
+    if (durationLabel) {
+        durationLabel.textContent = formatTime(audio.duration);
+    }
+});
+
 if (progressBar) {
-    audio.addEventListener('timeupdate', () => {
-        if (audio.duration) {
-            progressBar.value =
-                (audio.currentTime / audio.duration) * 100;
-        }
-    });
-
-    audio.addEventListener('loadedmetadata', () => {
-        progressBar.value = 0;
-    });
-
-    audio.addEventListener('ended', () => {
-        progressBar.value = 0;
-    });
-
     progressBar.addEventListener('input', () => {
         if (audio.duration) {
             audio.currentTime =
@@ -333,7 +375,7 @@ if (progressBar) {
 
 
 // ==========================================
-// 11. VOLUME CONTROL
+// 16. VOLUME CONTROL
 // ==========================================
 
 if (volumeSlider) {
@@ -346,20 +388,7 @@ if (volumeSlider) {
 
 
 // ==========================================
-// 12. NEXT AND PREVIOUS BUTTONS
-// ==========================================
-
-const controlButtons =
-    document.querySelectorAll('.control-buttons button');
-
-if (controlButtons.length >= 3) {
-    controlButtons[0].addEventListener('click', previousSong);
-    controlButtons[2].addEventListener('click', nextSong);
-}
-
-
-// ==========================================
-// 13. CREATE SONG ROW
+// 17. CREATE SONG ROW
 // ==========================================
 
 function createSongRow(songIndex, number) {
@@ -401,7 +430,7 @@ function createSongRow(songIndex, number) {
 
 
 // ==========================================
-// 14. RENDER MUSIC LIBRARY
+// 18. RENDER MUSIC LIBRARY
 // ==========================================
 
 function renderLibrary() {
@@ -413,10 +442,46 @@ function renderLibrary() {
         songList.appendChild(createSongRow(index, index + 1));
     });
 }
+// ==========================================
+// MUSIC SEARCH
+// ==========================================
 
+const searchInput = document.getElementById('search-input');
+
+if (searchInput) {
+    searchInput.addEventListener('input', () => {
+        const searchText = searchInput.value.toLowerCase().trim();
+
+        const filteredSongs = songs.filter(song =>
+            song.title.toLowerCase().includes(searchText) ||
+            song.artist.toLowerCase().includes(searchText) ||
+            song.album.toLowerCase().includes(searchText)
+        );
+
+        songList.replaceChildren();
+
+        filteredSongs.forEach((song, index) => {
+            const originalIndex = songs.findIndex(
+                item => item.id === song.id
+            );
+
+            songList.appendChild(
+                createSongRow(originalIndex, index + 1)
+            );
+        });
+
+        if (filteredSongs.length === 0) {
+            const message = document.createElement('div');
+            message.className = 'empty-state';
+            message.textContent = 'No songs found. Try another search.';
+
+            songList.appendChild(message);
+        }
+    });
+}
 
 // ==========================================
-// 15. RENDER RECENTLY PLAYED
+// 19. RENDER RECENTLY PLAYED
 // ==========================================
 
 function renderRecentlyPlayed() {
@@ -456,7 +521,7 @@ function renderRecentlyPlayed() {
 
 
 // ==========================================
-// 16. PLAYLIST NODE
+// 20. PLAYLIST NODE
 // ==========================================
 
 class PlaylistNode {
@@ -470,7 +535,7 @@ class PlaylistNode {
 
 
 // ==========================================
-// 17. PLAYLIST MANAGER
+// 21. PLAYLIST MANAGER
 // ==========================================
 
 class PlaylistManager {
@@ -524,7 +589,7 @@ const playlistContainer =
 
 
 // ==========================================
-// 18. RENDER PLAYLISTS
+// 22. RENDER PLAYLISTS
 // ==========================================
 
 function renderPlaylists() {
@@ -621,7 +686,7 @@ function renderPlaylists() {
 
 
 // ==========================================
-// 19. CREATE PLAYLIST
+// 23. CREATE PLAYLIST
 // ==========================================
 
 if (createPlaylistButton) {
@@ -637,11 +702,11 @@ if (createPlaylistButton) {
 
 
 // ==========================================
-// 20. ADD SONG TO QUEUE
+// 24. ADD SONG TO C++ QUEUE
 // ==========================================
 
 if (addToQueueButton) {
-    addToQueueButton.addEventListener('click', () => {
+    addToQueueButton.addEventListener('click', async () => {
         if (songs.length === 0) return;
 
         const songOptions = songs
@@ -665,28 +730,42 @@ if (addToQueueButton) {
             return;
         }
 
-        const added = playQueue.enqueue(songNumber - 1);
+        try {
+            const response = await fetch(QUEUE_API_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'text/plain'
+                },
+                body: String(songs[songNumber - 1].id)
+            });
 
-        if (!added) {
-            alert('Your queue is full. Maximum 10 songs allowed.');
-            return;
+            const result = await response.json();
+
+            if (!response.ok) {
+                alert(result.error || 'Unable to add song.');
+                return;
+            }
+
+            await loadQueue();
+
+            alert('Song added to your queue!');
+
+        } catch (error) {
+            console.error('Unable to add song:', error);
+            alert('Unable to connect to the backend.');
         }
-
-        renderQueue();
     });
 }
 
 
 // ==========================================
-// 21. RENDER UPCOMING QUEUE
+// 25. RENDER UPCOMING QUEUE
 // ==========================================
 
 function renderQueue() {
     if (!queueList) return;
 
     queueList.replaceChildren();
-
-    const queuedSongs = playQueue.getAll();
 
     if (queuedSongs.length === 0) {
         const empty = document.createElement('div');
@@ -707,20 +786,28 @@ function renderQueue() {
         return;
     }
 
-    queuedSongs.forEach((songIndex, position) => {
-        queueList.appendChild(createSongRow(songIndex, position + 1));
+    queuedSongs.forEach((song, position) => {
+        const songIndex = songs.findIndex(item => item.id === song.id);
+
+        if (songIndex !== -1) {
+            queueList.appendChild(
+                createSongRow(songIndex, position + 1)
+            );
+        }
     });
 }
 
 
 // ==========================================
-// 22. INITIALIZE APPLICATION
+// 26. INITIALIZE APPLICATION
 // ==========================================
 
-renderRecentlyPlayed();
-renderPlaylists();
-renderQueue();
+async function initializeApp() {
+    await loadSongs();
+    await loadRecentlyPlayed();
+    await loadQueue();
 
-loadSongs().then(() => {
-    loadRecentlyPlayed();
-});
+    renderPlaylists();
+}
+
+initializeApp();

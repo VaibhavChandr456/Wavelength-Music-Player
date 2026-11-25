@@ -4,6 +4,7 @@
 #include "RecentlyPlayed.h"
 #include <iostream>
 #include <string>
+#include "PlayQueue.h"
 
 using namespace std;
 
@@ -51,10 +52,21 @@ string songToJSON(const Song& s) {
 int main() {
     MusicLibrary library;
     RecentlyPlayed recentStack;
+    PlayQueue playQueue;
 
     loadSampleData(library);
 
     httplib::Server server;
+
+// HANDLE CORS PREFLIGHT REQUESTS
+server.Options(R"(.*)", [](const httplib::Request& req,
+                           httplib::Response& res) {
+    res.set_header("Access-Control-Allow-Origin", "*");
+    res.set_header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
+    res.set_header("Access-Control-Allow-Headers", "Content-Type");
+    res.status = 200;
+});
+
 
     // GET ALL SONGS
     server.Get("/api/songs", [&](const httplib::Request& req,
@@ -89,6 +101,71 @@ int main() {
         res.set_header("Access-Control-Allow-Origin", "*");
         res.set_content(json, "application/json");
     });
+
+    // GET UPCOMING QUEUE
+server.Get("/api/queue", [&](const httplib::Request& req,
+                             httplib::Response& res) {
+    string json = "[";
+
+    for (int i = 0; i < playQueue.getCount(); i++) {
+        if (i > 0) json += ",";
+
+        json += songToJSON(playQueue.getSongAt(i));
+    }
+
+    json += "]";
+
+    res.set_header("Access-Control-Allow-Origin", "*");
+    res.set_content(json, "application/json");
+});
+
+// ADD SONG TO UPCOMING QUEUE
+server.Post("/api/queue", [&](const httplib::Request& req,
+                              httplib::Response& res) {
+    try {
+        int songId = stoi(req.body);
+
+        const Song* song = library.findById(songId);
+
+        if (song == nullptr) {
+            res.status = 404;
+            res.set_header("Access-Control-Allow-Origin", "*");
+            res.set_content("{\"error\":\"Song not found\"}", "application/json");
+            return;
+        }
+
+        if (!playQueue.enqueue(*song)) {
+            res.status = 400;
+            res.set_header("Access-Control-Allow-Origin", "*");
+            res.set_content("{\"error\":\"Queue is full\"}", "application/json");
+            return;
+        }
+
+        res.set_header("Access-Control-Allow-Origin", "*");
+        res.set_content("{\"message\":\"Song added to queue\"}", "application/json");
+
+    } catch (...) {
+        res.status = 400;
+        res.set_header("Access-Control-Allow-Origin", "*");
+        res.set_content("{\"error\":\"Invalid song ID\"}", "application/json");
+    }
+});
+
+// REMOVE NEXT SONG FROM QUEUE
+server.Delete("/api/queue", [&](const httplib::Request& req,
+                                httplib::Response& res) {
+    Song removedSong;
+
+    if (!playQueue.dequeue(removedSong)) {
+        res.status = 400;
+        res.set_header("Access-Control-Allow-Origin", "*");
+        res.set_content("{\"error\":\"Queue is empty\"}", "application/json");
+        return;
+    }
+
+    res.set_header("Access-Control-Allow-Origin", "*");
+    res.set_content(songToJSON(removedSong), "application/json");
+});
 
     // ADD SONG TO RECENTLY PLAYED STACK
     server.Post("/api/recent", [&](const httplib::Request& req,

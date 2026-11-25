@@ -43,3 +43,10 @@ void PlayQueue::display() const {
         printSong(data[(front + i) % MAX]);
     }
 }
+int PlayQueue::getCount() const {
+    return count;
+}
+
+const Song& PlayQueue::getSongAt(int index) const {
+    return data[(front + index) % MAX];
+}
